@@ -29,6 +29,7 @@ const navItemsBase = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/restaurants", label: "Restaurants", icon: Utensils },
   { href: "/orders", label: "My Orders", icon: ListOrdered },
+  { href: "/me/payment-methods", label: "My Payment Methods", icon: CreditCard },
 ];
 
 const navItemsAdmin = [

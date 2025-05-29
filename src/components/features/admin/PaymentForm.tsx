@@ -41,20 +41,28 @@ type PaymentMethodFormValues = z.infer<typeof paymentMethodSchema>;
 
 interface PaymentFormProps {
   initialPaymentMethods: PaymentMethod[];
-  onSave: (methods: PaymentMethod[]) => void; 
+  onSave: (methods: PaymentMethod[]) => void;
+  isSaving?: boolean; // Added isSaving prop
 }
 
-export function PaymentForm({ initialPaymentMethods, onSave }: PaymentFormProps) {
+export function PaymentForm({ initialPaymentMethods, onSave, isSaving }: PaymentFormProps) {
   const { toast } = useToast();
-  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>(initialPaymentMethods);
+  // Ensure initialPaymentMethods is used to initialize state, and updates if prop changes.
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>(() => JSON.parse(JSON.stringify(initialPaymentMethods)));
   const [editingMethod, setEditingMethod] = useState<PaymentMethod | null>(null);
+  
+  useEffect(() => {
+    // Reflect changes from parent if initialPaymentMethods prop is updated (e.g., after a fetch)
+    setPaymentMethods(JSON.parse(JSON.stringify(initialPaymentMethods)));
+  }, [initialPaymentMethods]);
+
 
   const form = useForm<PaymentMethodFormValues>({
     resolver: zodResolver(paymentMethodSchema),
     defaultValues: {
       type: "Credit Card",
       details: "",
-      isPrimary: paymentMethods.length === 0, // Default to primary if no methods exist
+      isPrimary: false, // Default to false, will be adjusted based on existing methods
     },
   });
   
@@ -67,65 +75,81 @@ export function PaymentForm({ initialPaymentMethods, onSave }: PaymentFormProps)
         isPrimary: editingMethod.isPrimary,
       });
     } else {
-      form.reset({ type: "Credit Card", details: "", isPrimary: paymentMethods.length === 0 });
+      // When adding a new method, default isPrimary to true only if no other methods exist or none are primary.
+      const isAnyPrimary = paymentMethods.some(pm => pm.isPrimary);
+      form.reset({ 
+        type: "Credit Card", 
+        details: "", 
+        isPrimary: paymentMethods.length === 0 || !isAnyPrimary 
+      });
     }
-  }, [editingMethod, form, paymentMethods.length]);
+  }, [editingMethod, form, paymentMethods]);
 
 
   function onSubmit(data: PaymentMethodFormValues) {
+    // Prevent changes if parent is saving
+    if (isSaving) {
+        toast({ title: "Please wait", description: "Saving is in progress.", variant: "default"});
+        return;
+    }
+
     const newMethodData = {
+      id: data.id || `pm-${Date.now()}`, // Ensure new methods get a local temporary ID
       type: data.type,
       isPrimary: data.isPrimary,
       ...(data.type === "Credit Card" ? { last4: data.details } : { email: data.details }),
     };
 
-    let updatedMethods;
+    let updatedMethodsList;
     if (editingMethod && data.id) { // Editing existing
-      updatedMethods = paymentMethods.map(pm => pm.id === data.id ? { ...pm, ...newMethodData } : pm);
+      updatedMethodsList = paymentMethods.map(pm => pm.id === data.id ? { ...pm, ...newMethodData } : pm);
     } else { // Adding new
-      const newMethodWithId = { ...newMethodData, id: `pm-${Date.now()}` };
-      updatedMethods = [...paymentMethods, newMethodWithId];
+      updatedMethodsList = [...paymentMethods, newMethodData];
     }
     
     // Ensure only one primary if isPrimary is true for the current submission
-    if (data.isPrimary) {
-      const currentMethodId = editingMethod?.id || updatedMethods.find(m => m.last4 === data.details || m.email === data.details)?.id; // Heuristic to find new item if ID not set yet
-      updatedMethods = updatedMethods.map(pm => ({
+    if (newMethodData.isPrimary) {
+      updatedMethodsList = updatedMethodsList.map(pm => ({
         ...pm,
-        isPrimary: pm.id === currentMethodId,
+        isPrimary: pm.id === newMethodData.id,
       }));
     } else {
       // If unchecking primary, and it was the only primary, make another one primary (e.g., the first one)
-      const primaryExists = updatedMethods.some(pm => pm.isPrimary);
-      if (!primaryExists && updatedMethods.length > 0) {
-        updatedMethods[0].isPrimary = true;
+      // This logic ensures there's always a primary if methods exist.
+      const primaryExists = updatedMethodsList.some(pm => pm.isPrimary);
+      if (!primaryExists && updatedMethodsList.length > 0) {
+        updatedMethodsList[0].isPrimary = true;
       }
     }
 
-
-    setPaymentMethods(updatedMethods);
-    onSave(updatedMethods);
-    setEditingMethod(null);
-    toast({ title: "Payment methods updated!", description: "Your changes have been saved." });
+    setPaymentMethods(updatedMethodsList); // Update local UI state
+    onSave(updatedMethodsList); // Pass the complete list to the parent
+    setEditingMethod(null); // Reset form from edit mode
+    // Toast for local update success. Parent will show toast for API save result.
+    toast({ title: "Local Update", description: "Changes staged. Save via parent page to persist to server.", variant: "default" });
   }
 
-  const handleDeleteMethod = (id: string) => {
-    let updatedMethods = paymentMethods.filter(pm => pm.id !== id);
-    // If the deleted method was primary and there are other methods, make the first one primary
-    if (updatedMethods.length > 0 && !updatedMethods.some(pm => pm.isPrimary)) {
-      updatedMethods[0].isPrimary = true; 
+  const handleDeleteMethod = (idToDelete: string) => {
+    if (isSaving) {
+        toast({ title: "Please wait", description: "Saving is in progress.", variant: "default"});
+        return;
     }
-    setPaymentMethods(updatedMethods);
-    onSave(updatedMethods);
-    if (editingMethod?.id === id) setEditingMethod(null); // Clear form if deleting the one being edited
-    toast({ title: "Payment method removed." });
+    let updatedMethodsList = paymentMethods.filter(pm => pm.id !== idToDelete);
+    // If the deleted method was primary and there are other methods, make the first one primary
+    if (updatedMethodsList.length > 0 && !updatedMethodsList.some(pm => pm.isPrimary)) {
+      updatedMethodsList[0].isPrimary = true; 
+    }
+    setPaymentMethods(updatedMethodsList);
+    onSave(updatedMethodsList); // Pass updated list to parent
+    if (editingMethod?.id === idToDelete) setEditingMethod(null); // Clear form if deleting the one being edited
+    toast({ title: "Local Update", description: "Method removed locally. Save via parent page to attempt persistence.", variant: "default" });
   };
 
   return (
     <Card className="shadow-lg bg-card">
       <CardHeader>
         <CardTitle>Manage Payment Methods</CardTitle>
-        <CardDescription>Add, edit, or remove payment methods for the platform.</CardDescription>
+        <CardDescription>Add, edit, or remove payment methods for the platform. Changes require a final save.</CardDescription>
       </CardHeader>
       <CardContent>
         <div className="space-y-6">
@@ -143,8 +167,14 @@ export function PaymentForm({ initialPaymentMethods, onSave }: PaymentFormProps)
                     {method.isPrimary && <span className="ml-2 text-xs text-primary font-semibold">(Primary)</span>}
                   </div>
                   <div className="space-x-2">
-                    <Button variant="outline" size="sm" onClick={() => setEditingMethod(method)}><Edit3 className="h-3 w-3 mr-1"/>Edit</Button>
-                    <Button variant="ghost" size="icon" className="text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => handleDeleteMethod(method.id)} disabled={paymentMethods.length === 1 && method.isPrimary}>
+                    <Button variant="outline" size="sm" onClick={() => setEditingMethod(method)} disabled={isSaving}><Edit3 className="h-3 w-3 mr-1"/>Edit</Button>
+                    <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="text-destructive hover:bg-destructive/10 hover:text-destructive" 
+                        onClick={() => handleDeleteMethod(method.id!)} // ID should exist for existing methods
+                        disabled={isSaving || (paymentMethods.length === 1 && method.isPrimary)}
+                    >
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
@@ -165,7 +195,7 @@ export function PaymentForm({ initialPaymentMethods, onSave }: PaymentFormProps)
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Type</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
+                      <Select onValueChange={field.onChange} value={field.value} disabled={isSaving}>
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Select payment type" />
@@ -188,7 +218,7 @@ export function PaymentForm({ initialPaymentMethods, onSave }: PaymentFormProps)
                     <FormItem>
                       <FormLabel>{form.watch("type") === "Credit Card" ? "Last 4 Digits" : "Email Address"}</FormLabel>
                       <FormControl>
-                        <Input placeholder={form.watch("type") === "Credit Card" ? "e.g., 4242" : "e.g., user@example.com"} {...field} />
+                        <Input placeholder={form.watch("type") === "Credit Card" ? "e.g., 4242" : "e.g., user@example.com"} {...field} disabled={isSaving} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -203,7 +233,7 @@ export function PaymentForm({ initialPaymentMethods, onSave }: PaymentFormProps)
                         <Checkbox
                           checked={field.value}
                           onCheckedChange={field.onChange}
-                          disabled={paymentMethods.length === 0 && !editingMethod || (editingMethod?.id === field.value && paymentMethods.length === 1 && editingMethod.isPrimary)} // Disable unchecking if it's the only method and primary
+                          disabled={isSaving || (paymentMethods.length === 0 && !editingMethod) || (editingMethod?.isPrimary && paymentMethods.filter(pm => pm.id !== editingMethod.id).every(pm => !pm.isPrimary) && paymentMethods.length > 0)}
                         />
                       </FormControl>
                       <div className="space-y-1 leading-none">
@@ -213,11 +243,13 @@ export function PaymentForm({ initialPaymentMethods, onSave }: PaymentFormProps)
                   )}
                 />
                 <div className="flex gap-2 pt-2">
-                  <Button type="submit" className="bg-accent hover:bg-accent/90 text-accent-foreground">
-                    <PlusCircle className="mr-2 h-4 w-4" /> {editingMethod ? "Save Changes" : "Add Method"}
+                  <Button type="submit" className="bg-accent hover:bg-accent/90 text-accent-foreground" disabled={isSaving}>
+                    {isSaving ? (editingMethod ? "Saving..." : "Adding...") : (
+                      <><PlusCircle className="mr-2 h-4 w-4" /> {editingMethod ? "Save Changes" : "Add Method"}</>
+                    )}
                   </Button>
                   {editingMethod && (
-                    <Button variant="outline" onClick={() => { setEditingMethod(null);}}>
+                    <Button variant="outline" onClick={() => { setEditingMethod(null);}} disabled={isSaving}>
                       Cancel Edit
                     </Button>
                   )}

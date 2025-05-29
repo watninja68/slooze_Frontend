@@ -12,11 +12,26 @@ interface AuthContextType {
   logout: () => void;
   isLoading: boolean;
   isAuthenticated: boolean;
+  getToken: () => string | null;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const AUTH_STORAGE_KEY = 'sllozeUser';
+const AUTH_USER_STORAGE_KEY = 'sllozeUser';
+const AUTH_TOKEN_STORAGE_KEY = 'sllozeAuthToken';
+
+// Helper functions for base64 URL encoding/decoding
+const base64UrlEncode = (str: string): string => {
+  return btoa(str).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+};
+
+const base64UrlDecode = (str: string): string => {
+  str = str.replace(/-/g, '+').replace(/_/g, '/');
+  while (str.length % 4) {
+    str += '=';
+  }
+  return atob(str);
+};
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
@@ -25,15 +40,49 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const pathname = usePathname();
 
   useEffect(() => {
-    const storedUser = localStorage.getItem(AUTH_STORAGE_KEY);
-    if (storedUser) {
+    const token = localStorage.getItem(AUTH_TOKEN_STORAGE_KEY);
+    if (token) {
       try {
-        const parsedUser = JSON.parse(storedUser) as User;
-        setUser(parsedUser);
+        const [_header, payloadB64, _signature] = token.split('.');
+        if (!payloadB64) {
+          throw new Error("Invalid token format");
+        }
+        const payload = JSON.parse(base64UrlDecode(payloadB64));
+
+        if (payload.exp * 1000 < Date.now()) {
+          console.log("Token expired");
+          throw new Error("Token expired");
+        }
+
+        // Simulate signature verification (optional for this mock)
+        // const expectedSignature = base64UrlEncode("mock-signature");
+        // if (signature !== expectedSignature) {
+        //   throw new Error("Invalid signature");
+        // }
+
+        const foundUser = mockUsers.find(u => u.id === payload.id);
+        if (foundUser) {
+          const userDetails: User = {
+            ...foundUser, // for fields like avatarUrl, region
+            id: payload.id,
+            name: payload.name,
+            email: payload.email,
+            role: payload.role,
+          };
+          setUser(userDetails);
+          localStorage.setItem(AUTH_USER_STORAGE_KEY, JSON.stringify(userDetails));
+        } else {
+          throw new Error("User from token not found in mock users");
+        }
       } catch (error) {
-        console.error("Failed to parse stored user:", error);
-        localStorage.removeItem(AUTH_STORAGE_KEY);
+        console.error("Failed to process auth token:", error);
+        localStorage.removeItem(AUTH_TOKEN_STORAGE_KEY);
+        localStorage.removeItem(AUTH_USER_STORAGE_KEY);
+        setUser(null);
       }
+    } else {
+      localStorage.removeItem(AUTH_USER_STORAGE_KEY); // Ensure user key is also cleared if no token
+      setUser(null);
     }
     setIsLoading(false);
   }, []);
@@ -53,8 +102,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const login = (userId: string) => {
     const foundUser = mockUsers.find(u => u.id === userId);
     if (foundUser) {
+      const header = { alg: "HS256", typ: "JWT" };
+      const payload = {
+        id: foundUser.id,
+        role: foundUser.role,
+        email: foundUser.email,
+        name: foundUser.name,
+        exp: Math.floor(Date.now() / 1000) + (60 * 60), // 1 hour expiration
+      };
+      const signature = "mock-signature"; // Placeholder
+
+      const token = `${base64UrlEncode(JSON.stringify(header))}.${base64UrlEncode(JSON.stringify(payload))}.${base64UrlEncode(signature)}`;
+      
+      localStorage.setItem(AUTH_TOKEN_STORAGE_KEY, token);
+      // Keep user object in local storage for now, though JWT is source of truth
+      localStorage.setItem(AUTH_USER_STORAGE_KEY, JSON.stringify(foundUser)); 
       setUser(foundUser);
-      localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(foundUser));
       router.push('/dashboard');
     } else {
       // Handle login failure (e.g., show an error message)
@@ -64,14 +127,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const logout = () => {
     setUser(null);
-    localStorage.removeItem(AUTH_STORAGE_KEY);
+    localStorage.removeItem(AUTH_USER_STORAGE_KEY);
+    localStorage.removeItem(AUTH_TOKEN_STORAGE_KEY);
     router.push('/login');
   };
   
   const isAuthenticated = !!user;
 
+  const getToken = () => localStorage.getItem(AUTH_TOKEN_STORAGE_KEY);
+
   return (
-    <AuthContext.Provider value={{ user, login, logout, isLoading, isAuthenticated }}>
+    <AuthContext.Provider value={{ user, login, logout, isLoading, isAuthenticated, getToken }}>
       {children}
     </AuthContext.Provider>
   );
