@@ -1,0 +1,113 @@
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+}
+
+@layer base {
+  :root {
+    --background: 210 33% 90%; /* #D9E2EC Light grayish blue */
+    --foreground: 210 25% 25%; /* Dark grayish blue for text */
+
+    --card: 0 0% 100%; /* White cards for clean look */
+    --card-foreground: 210 25% 25%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 210 25% 25%;
+
+    --primary: 210 100% 65%; /* #4BABFF Saturated sky blue */
+    --primary-foreground: 0 0% 98%; /* White text on primary */
+
+    --secondary: 210 40% 80%; /* Lighter variant of sky blue */
+    --secondary-foreground: 210 25% 25%;
+
+    --muted: 210 33% 85%; /* Muted grayish blue */
+    --muted-foreground: 210 25% 45%; /* Darker muted text */
+
+    --accent: 81 72% 40%; /* #72B01D Soft, muted green */
+    --accent-foreground: 81 72% 95%; /* Light text on accent */
+
+    --destructive: 0 70% 50%; /* A bit softer red */
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 210 30% 78%; /* Border color */
+    --input: 210 33% 97%; /* Input background - very light */
+    --ring: 210 100% 65%; /* Ring color - primary */
+
+    --radius: 0.5rem;
+
+    /* Sidebar specific colors for a light theme */
+    --sidebar-background: 210 33% 96%; /* Very light blue/gray, slightly off-white */
+    --sidebar-foreground: 210 25% 30%; /* Dark text for sidebar */
+    --sidebar-primary: 210 100% 65%; /* Primary for active items - sky blue */
+    --sidebar-primary-foreground: 0 0% 98%; /* White text on primary */
+    --sidebar-accent: 210 33% 88%; /* Hover state - slightly different light blue/gray */
+    --sidebar-accent-foreground: 210 25% 20%; /* Darker text for hover */
+    --sidebar-border: 210 30% 80%; /* Border for sidebar elements */
+    --sidebar-ring: 210 100% 65%; /* Ring for focus, same as primary */
+
+    --chart-1: 210 100% 65%;
+    --chart-2: 81 72% 40%;
+    --chart-3: 30 80% 55%;
+    --chart-4: 280 65% 60%;
+    --chart-5: 340 75% 55%;
+  }
+
+  .dark {
+    /* For dark mode, we'll invert or use a darker palette if specified.
+       For now, keeping it simple and focusing on the light theme as requested.
+       A full dark theme design would require separate HSL values.
+       Using a generic dark theme for now.
+    */
+    --background: 210 20% 12%;
+    --foreground: 210 20% 90%;
+
+    --card: 210 20% 15%;
+    --card-foreground: 210 20% 90%;
+
+    --popover: 210 20% 15%;
+    --popover-foreground: 210 20% 90%;
+
+    --primary: 210 100% 65%;
+    --primary-foreground: 210 100% 15%;
+
+    --secondary: 210 30% 30%;
+    --secondary-foreground: 210 20% 90%;
+
+    --muted: 210 20% 25%;
+    --muted-foreground: 210 20% 60%;
+
+    --accent: 81 72% 50%;
+    --accent-foreground: 81 72% 10%;
+
+    --destructive: 0 60% 50%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 210 20% 25%;
+    --input: 210 20% 20%;
+    --ring: 210 100% 65%;
+
+    --sidebar-background: 210 20% 18%;
+    --sidebar-foreground: 210 20% 85%;
+    --sidebar-primary: 210 100% 65%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 210 20% 28%;
+    --sidebar-accent-foreground: 210 20% 95%;
+    --sidebar-border: 210 20% 22%;
+    --sidebar-ring: 210 100% 65%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
