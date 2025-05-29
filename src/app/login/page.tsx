@@ -178,7 +178,7 @@ export default function LoginPage() {
         <CardFooter className="text-center block">
           <p className="text-sm text-muted-foreground">
             This is a demo. Use any email from the mock users (e.g.,
-            nick.fury@slloze.xyz) and any password.
+            nick.fury@slooze.xyz ) and any password.
           </p>
         </CardFooter>
       </Card>
