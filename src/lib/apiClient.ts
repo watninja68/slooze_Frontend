@@ -1,6 +1,6 @@
 // src/lib/apiClient.ts
 
-const AUTH_TOKEN_STORAGE_KEY = 'sllozeAuthToken'; // Same key as in AuthContext
+const AUTH_TOKEN_STORAGE_KEY = "sllozeAuthToken"; // Same key as in AuthContext
 
 interface ApiErrorData {
   message?: string;
@@ -13,7 +13,7 @@ export class ApiError extends Error {
 
   constructor(message: string, status: number, data?: ApiErrorData) {
     super(message);
-    this.name = 'ApiError';
+    this.name = "ApiError";
     this.status = status;
     this.data = data;
     // Set the prototype explicitly.
@@ -23,18 +23,21 @@ export class ApiError extends Error {
 
 export async function fetchApi<T = any>(
   endpoint: string,
-  method: string = 'GET',
-  body: Record<string, any> | null = null
+  method: string = "GET",
+  body: Record<string, any> | null = null,
 ): Promise<T> {
-  const token = typeof window !== 'undefined' ? localStorage.getItem(AUTH_TOKEN_STORAGE_KEY) : null;
+  const token =
+    typeof window !== "undefined"
+      ? localStorage.getItem(AUTH_TOKEN_STORAGE_KEY)
+      : null;
   const headers = new Headers();
 
   if (body) {
-    headers.append('Content-Type', 'application/json');
+    headers.append("Content-Type", "application/json");
   }
 
   if (token) {
-    headers.append('Authorization', `Bearer ${token}`);
+    headers.append("Authorization", `Bearer ${token}`);
   }
 
   const config: RequestInit = {
@@ -49,7 +52,7 @@ export async function fetchApi<T = any>(
   // Assuming relative paths are handled by Next.js proxy or are relative to the current domain.
   // No need to prepend a base URL for now as per instructions.
   const requestUrl = endpoint;
-
+  console.log(requestUrl);
   try {
     const response = await fetch(requestUrl, config);
 
@@ -62,38 +65,40 @@ export async function fetchApi<T = any>(
         errorData = { message: response.statusText };
       }
       throw new ApiError(
-        errorData?.message || `API request failed with status ${response.status}`,
+        errorData?.message ||
+          `API request failed with status ${response.status}`,
         response.status,
-        errorData
+        errorData,
       );
     }
 
     if (response.status === 204) {
       // No Content
-      return null as T; 
+      return null as T;
     }
-    
+
     // Check if response has content before trying to parse
     const contentType = response.headers.get("content-type");
     if (contentType && contentType.indexOf("application/json") !== -1) {
-        return response.json() as Promise<T>;
+      return response.json() as Promise<T>;
     } else {
-        // Handle non-JSON responses if necessary, or return as is for certain types
-        // For now, returning null if not explicitly JSON and not 204
-        // This might need adjustment based on actual API behavior
-        return null as T; // Or response.text() if text is expected
+      // Handle non-JSON responses if necessary, or return as is for certain types
+      // For now, returning null if not explicitly JSON and not 204
+      // This might need adjustment based on actual API behavior
+      return null as T; // Or response.text() if text is expected
     }
-
   } catch (error) {
     if (error instanceof ApiError) {
       throw error;
     }
     // Network error or other unexpected issue
-    console.error('API call failed:', error);
+    console.error("API call failed:", error);
     throw new ApiError(
-      error instanceof Error ? error.message : 'An unknown network error occurred',
+      error instanceof Error
+        ? error.message
+        : "An unknown network error occurred",
       0, // Using 0 for status when it's a network or unknown error
-      { originalError: error }
+      { originalError: error },
     );
   }
 }
